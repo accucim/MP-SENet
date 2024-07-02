@@ -35,17 +35,23 @@ def inference(a):
     state_dict = load_checkpoint(a.checkpoint_file, device)
     model.load_state_dict(state_dict['generator'])
 
-    with open(a.input_test_file, 'r', encoding='utf-8') as fi:
-        test_indexes = [x.split('|')[0] for x in fi.read().split('\n') if len(x) > 0]
+    # with open(a.input_test_file, 'r', encoding='utf-8') as fi:
+    #     test_indexes = [x.split('|')[0] for x in fi.read().split('\n') if len(x) > 0]
+
+    # 본인 경로 적용
+    input_dir = sorted(glob.glob("/data/yjpak/MP-SENet/VoiceBank+DEMAND/test/*.ogg"))[:50]
+
+    
 
     os.makedirs(a.output_dir, exist_ok=True)
 
     model.eval()
 
     with torch.no_grad():
-        for i, index in enumerate(test_indexes):
+        for i, index in enumerate(sorted(input_dir)):
+            
             print(index)
-            noisy_wav, _ = librosa.load(os.path.join(a.input_noisy_wavs_dir, index+'.wav'), h.sampling_rate)
+            noisy_wav, _ = librosa.load(os.path.join(input_dir[i]), sr=h.sampling_rate)
             noisy_wav = torch.FloatTensor(noisy_wav).to(device)
             norm_factor = torch.sqrt(len(noisy_wav) / torch.sum(noisy_wav ** 2.0)).to(device)
             noisy_wav = (noisy_wav * norm_factor).unsqueeze(0)
@@ -54,7 +60,8 @@ def inference(a):
             audio_g = mag_pha_istft(amp_g, pha_g, h.n_fft, h.hop_size, h.win_size, h.compress_factor)
             audio_g = audio_g / norm_factor
 
-            output_file = os.path.join(a.output_dir, index+'.wav')
+            # 이름 원하는 이름으로 다시 설정하든지 아니면 그대로 쓰셔도됩니다.
+            output_file = os.path.join(a.output_dir, f'{i}.wav')
 
             sf.write(output_file, audio_g.squeeze().cpu().numpy(), h.sampling_rate, 'PCM_16')
 
@@ -65,7 +72,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_clean_wavs_dir', default='VoiceBank+DEMAND/wavs_clean')
     parser.add_argument('--input_noisy_wavs_dir', default='VoiceBank+DEMAND/wav_noisy')
-    parser.add_argument('--input_test_file', default='VoiceBank+DEMAND/test.txt')
+    parser.add_argument('--input_test_file', default='VoiceBank+DEMAND/test/') # 여기 경로 수정하든지 아니면 terminal에서 코드 실행 할 때 경로 입력 필요.
     parser.add_argument('--output_dir', default='generated_files')
     parser.add_argument('--checkpoint_file', required=True)
     a = parser.parse_args()
